@@ -1,0 +1,181 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Question 1
+
+Consider *w(u)* as the weighting function of a linear filter defined as:
+$$
+w(u) =
+\begin{cases}
+1 & \text{if u=0} \\
+\frac{1}{2} & \text{if u=1 or -1} \\
+0 & \text{otherwise}
+\end{cases}
+$$
+Do the following:
+(a) Write the output $Y_t$ in terms of the input $X_t$.
+$$
+  Y_t = \sum^{\omega}_{u=-\omega} \omega_{t}(u)X_{t-u}\\
+  = \frac{1}{2}X_{t-1}+X_t+\frac{1}{2}X_{t+1}\\
+$$
+(b) Derive the transfer function $W(\omega)$ of the linear filter.
+$$
+  W(\omega) = \sum^\omega_{u=-\omega}\omega(u)e^{i\omega u}\\
+  = \frac{1}{2}e^{-i\omega}+e^{i\omega 0}+\frac{1}{2}e^{i\omega}\\
+  = 1+\frac{1}{2}(e^{-i\omega}+e^{i\omega})
+$$
+(c) Assume that the input $X_t$ is a white-noise process with error variance $\sigma_e^2 = 1$ and derive the spectral density function of the output $Y_t$.
+$$
+X_t \text{~} N(0,1)\\
+\therefore \lambda^X(\omega) = \frac{1}{2\pi}\\
+\lambda^y(\omega) = |W(\omega)|^2 \lambda^X(\omega)\\
+|W(\omega)|^2 = |1+\frac{1}{2}(e^{-i\omega}+e^{i\omega})||1+\frac{1}{2}(e^{-i\omega}+e^{i\omega})|\\
+=1+(e^{-i\omega}+e^{i\omega})+\frac{1}{4}(e^0+e^{-2i\omega}+e^{2i\omega}+e^0)\\
+=(1+\frac{1}{2})+(e^{-i\omega}+e^{i\omega})+\frac{1}{4}(e^{-2i\omega}+e^{2i\omega})\\
+=\frac{3}{2}+2cos(\omega)+\frac{1}{2}cos(2\omega)\\\\
+=> \lambda^y(\omega) = (\frac{3}{2} + 2cos(\omega)+\frac{1}{2}cos(2\omega))(\frac{1}{2\pi})
+$$
+(d) Plot the spectral density function of the output $Y_t$ in Excel or R from $\omega = 0 \text{ to } \omega = \pi$  to and also report the values for $\lambda(\omega)$.
+
+```{r message=FALSE}
+library(ggplot2)
+library(knitr)
+
+lambda_y_w = function(w){
+  (3/2+(2*cos(w))+(1/2*cos(2*w)))/(2*pi)
+}
+
+x = seq(0,pi,0.01)
+
+vals = sapply(x,lambda_y_w)
+
+ggplot()+geom_line(aes(y=vals,x=x)) + xlab(expression(omega))+ylab(expression(lambda^y*(omega)))
+```
+
+## Question 2
+
+Use SAS or R and answer the following questions:
+a) Determine if the time series needs a variance stabilizing transformation.
+```{r}
+library(readxl)
+tut1_data = read_xlsx('H:\\Werk\\Time Series\\time_series\\TUT1_2020.xlsx')
+
+x = c(1:length(tut1_data$Y))
+ggplot()+geom_line(aes(y=tut1_data$Y,x=x)) + ylab(expression(y))+xlab('time')+ggtitle('Plot of Y')
+```
+
+Considering the first difference to see if the series needs a variance stabilizing transformation
+
+```{r message=FALSE}
+library(tseries)
+
+tseries = ts(tut1_data)
+dtut1 = diff(tseries)
+
+x = c(1:length(dtut1))
+ggplot()+geom_line(aes(y=dtut1,x=x)) + ylab(expression(dy))+xlab('time')+ggtitle('Plot of first difference of Y')
+```
+The differences seems relatively stable over time.  This would suggest that a variance stabilizing transformation is not needed.
+
+b) Determine the stationarity of the time series by using Dickey Fuller’s test. If a difference is needed to achieve stationarity, how many differences? State the null hypothesis and report relevant statistics and p-values (for the original time series and after each difference). Interpret.
+
+We test the following hypothesis for stationaraity:
+$H_0: \phi_1 = 1$
+
+```{r}
+library(urca)
+
+df_test = ur.df(tseries,type=c('trend'),lags=0)
+summary(df_test)
+```
+
+We can see that the t-value is 0.8326 which is larger than -3.43, so we cannot reject $H_0$ and conclude that the series has a unit root and is therefore non-stationary.
+
+We attempt 1 difference and apply the Dickey-Fuller test again:
+
+```{r}
+dtseries = diff(tseries)
+df_test = ur.df(dtseries,type=c('trend'),lags=0)
+summary(df_test)
+```
+
+Now we see that the t-value is -5.417 which is smaller than -3.43, so we reject $H_0$ and conclude that the series is now stationary.
+
+c) Identify the series in the ARIMA class models by studying the ACFs,PACFs of the original or appropriately transformed or differenced series. Give reasons why you choose a specific model for a series. You can also check the Extended ACF (ESACF) function for models. 
+
+```{r}
+acf(dtseries)
+```
+
+The ACFs appear to degrade slowly, so lets consider the PACF
+
+```{r}
+pacf(dtseries)
+```
+
+The PACF cut-off after 1, possibly 2 lags, so we will attempt to fit an ARIMA(1,1,0) and an ARIMA(2,1,0).  Lets consider the extended ACF:
+```{r message=FALSE}
+library(TSA)
+
+eacf(dtseries)
+```
+
+The EACF seems to suggest an ARIMA(2,1,0) or even an ARIMA(1,1,1)
+
+d) Estimate the parameters of the identified models
+
+```{r}
+cwp <- function (object){
+#
+# cwp <--> ``coefficients with p-values''
+#
+ coef <- coef(object)
+ if (length(coef) > 0) {
+ mask <- object$mask
+ sdev <- sqrt(diag(vcov(object)))
+ t.rat <- rep(NA, length(mask))
+ t.rat[mask] <- coef[mask]/sdev
+ pt <- 2 * pnorm(-abs(t.rat))
+ setmp <- rep(NA, length(mask))
+ setmp[mask] <- sdev
+ sum <- rbind(coef, setmp, t.rat, pt)
+ dimnames(sum) <- list(c("coef", "s.e.", "t ratio", "p-value"),
+ names(coef))
+ return(sum)
+ } else return(NA)
+}
+
+arima110 =arima(tseries, order=c(1,1,0))
+arima110
+cwp(arima110)
+arima111 =arima(tseries, order=c(1,1,1))
+arima111
+cwp(arima111)
+arima210 =arima(tseries, order=c(2,1,0))
+arima210
+cwp(arima210)
+
+```
+
+For each of the models, their parameters are significant, as all parameters have a p-value < 0.05.
+
+e) Investigate the residual ACFs and PACFs of the chosen model by using the Ljung-Box-Pierce test. Report the Q-statistic and p-value specifically at lag m=12. ($H_0:\rho_k = 0 \text{ } k \le 12$)
+
+```{r}
+Box.test(arima110$residuals, type="Ljung-Box")
+Box.test(arima111$residuals, type="Ljung-Box")
+Box.test(arima210$residuals, type="Ljung-Box")
+```
+
+For each of the fitted models, we test the hypothesis:
+$H_0:\rho_k=0$
+
+With a p-value > 0 for each of the models, we do not reject $H_0$ and conclude that all their residuals are approximately white noise.
+
+f) Which model is best to use. Verify your answer.
+
+As all models have white noise residuals, following the principle of parsimony we would prefer the simplest model, that being the ARIMA(1,1,0).  However, it should be noted that the ARIMA(2,1,0) model's residuals are more white noise than the rest.
