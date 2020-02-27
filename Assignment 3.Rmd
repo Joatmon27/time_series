@@ -1,0 +1,73 @@
+---
+title: "Assignment 3"
+author: "PW Janse van Rensburg, 15338673"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Question 1
+
+Consider the following ARMA(1,1) model:
+$$
+X_t +0.35X_{t-1} = \epsilon_t + 0.5\epsilon_{t-1}
+$$
+
+Express the model in an MA representation if it exists. (Determine $\psi_1$ and $\psi_2$ )
+
+$$
+\begin{align}
+\Phi(b)\Psi(B) &= \Theta(b)  \\
+(1+0.35B)(1+\psi_1B+\psi_2B+...) &= (1+0.5B)  \\
+1+(\psi_1+0.35)B+(\psi_2+0.35\psi_1)B^2 &= 1+0.5B  \\
+B: \psi_1+0.35 &= 0.5  \\
+\psi_1 &= 0.15  \\
+B^2: \psi_2+0.35\psi_1 &= 0  \\
+\psi_2 &= -0.35(0.15) = -0.0525  \\
+X_t = \epsilon_t+0.15\epsilon_{t-1}-0.0525\epsilon_{t-2}
+\end{align}
+$$
+
+Verify these ψ weights by using R. Determine up to 10 lags.
+
+```{r}
+psi = ARMAtoMA(ar=-0.35,ma=0.5,lag.max = 10)
+round(psi,4)
+```
+
+Consider the following observed values of the ARMA(1,1) model: 
+
+|t  |Xt    |
+|---|------|
+|1  |0.220 |
+|2  |-0.004|
+|3  |0.691 |
+|4  |0.055 |
+|5  |0.185 |
+|6  |-2.034|
+|7  |-0.011|
+|8  |-1.369|
+|9  |0.521 |
+|10 |0.214 |
+|11 |-0.196|
+|12 |-1.743|
+|13 |-0.221|
+|14 |-0.024|
+|15 |0.131 |
+
+Use the difference method and obtain the forecasts for $X_{15}(1),X_{15}(2)$ and $X_{15}(3)$
+
+$$
+\begin{align}
+X_{15}(1)&=0.10052556\\
+X_{15}(2)&=-0.035183947\\
+X_{15}(3)&=0.012314381\\
+\end{align}
+$$
+The value for $X_{16} =1.1039$ was observed. Update the forecasts of $X_{17}$ and $X_{18}$.
+$$
+\begin{align}
+X_{17}&=0.062039969\\
+X_{18}&=-0.021713989
+\end{align}
+$$
